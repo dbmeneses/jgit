@@ -30,14 +30,10 @@ import org.eclipse.jgit.util.LfsFactory;
 /**
  * A source that may have supplied some (or all) of the result file.
  * <p>
- * Candidates are kept in a queue by BlameGenerator, allowing the generator to
- * perform a parallel search down the parents of any merges that are discovered
- * during the history traversal. Each candidate retains a {@link #regionList}
- * describing sections of the result file the candidate has taken responsibility
- * for either directly or indirectly through its history. Actual blame from this
- * region list will be assigned to the candidate when its ancestor commit(s) are
- * themselves converted into Candidate objects and the ancestor's candidate uses
- * {@link #takeBlame(EditList, Candidate)} to accept responsibility for sections
+ * Candidates are kept in a queue by BlameGenerator, allowing the generator to perform a parallel search down the parents of any merges that are discovered
+ * during the history traversal. Each candidate retains a {@link #regionList} describing sections of the result file the candidate has taken responsibility
+ * for either directly or indirectly through its history. Actual blame from this region list will be assigned to the candidate when its ancestor commit(s) are
+ * themselves converted into Candidate objects and the ancestor's candidate uses {@link #takeBlame(EditList, Candidate)} to accept responsibility for sections
  * of the result.
  */
 class Candidate {
@@ -59,20 +55,16 @@ class Candidate {
 	/**
 	 * Chain of regions this candidate may be blamed for.
 	 * <p>
-	 * This list is always kept sorted by resultStart order, making it simple to
-	 * merge-join with the sorted EditList during blame assignment.
+	 * This list is always kept sorted by resultStart order, making it simple to merge-join with the sorted EditList during blame assignment.
 	 */
 	Region regionList;
 
 	/**
 	 * Score assigned to the rename to this candidate.
 	 * <p>
-	 * Consider the history "A&lt;-B&lt;-C". If the result file S in C was
-	 * renamed to R in B, the rename score for this rename will be held in this
-	 * field by the candidate object for B. By storing the score with B, the
-	 * application can see what the rename score was as it makes the transition
-	 * from C/S to B/R. This may seem backwards since it was C that performed
-	 * the rename, but the application doesn't learn about path R until B.
+	 * Consider the history "A&lt;-B&lt;-C". If the result file S in C was renamed to R in B, the rename score for this rename will be held in this
+	 * field by the candidate object for B. By storing the score with B, the application can see what the rename score was as it makes the transition
+	 * from C/S to B/R. This may seem backwards since it was C that performed the rename, but the application doesn't learn about path R until B.
 	 */
 	int renameScore;
 
@@ -151,8 +143,7 @@ class Candidate {
 		Region bTail = null;
 
 		for (int eIdx = 0; eIdx < editList.size();) {
-			// If there are no more regions left, neither side has any
-			// more responsibility for the result. Remaining edits can
+			// If there are no more regions left, neither side has any more responsibility for the result. Remaining edits can
 			// be safely ignored.
 			if (r == null)
 				return;
@@ -165,8 +156,7 @@ class Candidate {
 				continue;
 			}
 
-			// Next candidate region starts before the edit. Assign some
-			// of the blame onto A, but possibly split and also on B.
+			// Next candidate region starts before the edit. Assign some of the blame onto A, but possibly split and also on B.
 			if (r.sourceStart < e.getBeginB()) {
 				int d = e.getBeginB() - r.sourceStart;
 				if (r.length <= d) {
@@ -185,8 +175,7 @@ class Candidate {
 
 			// At this point e.getBeginB() <= r.sourceStart.
 
-			// An empty edit on the B side isn't relevant to this split,
-			// as it does not overlap any candidate region.
+			// An empty edit on the B side isn't relevant to this split, as it does not overlap any candidate region.
 			if (e.getLengthB() == 0) {
 				eIdx++;
 				continue;
@@ -203,8 +192,7 @@ class Candidate {
 				continue;
 			}
 
-			// This region extends beyond the edit. Blame the first
-			// half of the region on B, and process the rest after.
+			// This region extends beyond the edit. Blame the first half of the region on B, and process the rest after.
 			int len = e.getEndB() - r.sourceStart;
 			bTail = add(bTail, b, r.splitFirst(r.sourceStart, len));
 			r.slideAndShrink(len);
@@ -214,8 +202,7 @@ class Candidate {
 		if (r == null)
 			return;
 
-		// For any remaining region, pass the blame onto A after shifting
-		// the source start to account for the difference between the two.
+		// For any remaining region, pass the blame onto A after shifting the source start to account for the difference between the two.
 		Edit e = editList.get(editList.size() - 1);
 		int endB = e.getEndB();
 		int d = endB - e.getEndA();
@@ -238,12 +225,9 @@ class Candidate {
 			return n;
 		}
 
-		// If the prior region ends exactly where the new region begins
-		// in both the result and the source, combine these together into
-		// one contiguous region. This occurs when intermediate commits
-		// have inserted and deleted lines in the middle of a region. Try
-		// to report this region as a single region to the application,
-		// rather than in fragments.
+		// If the prior region ends exactly where the new region begins in both the result and the source, combine these together into
+		// one contiguous region. This occurs when intermediate commits have inserted and deleted lines in the middle of a region. Try
+		// to report this region as a single region to the application, rather than in fragments.
 		if (aTail.resultStart + aTail.length == n.resultStart && aTail.sourceStart + aTail.length == n.sourceStart) {
 			aTail.length += n.length;
 			return aTail;
@@ -266,8 +250,7 @@ class Candidate {
 	}
 
 	void mergeRegions(Candidate other) {
-		// regionList is always sorted by resultStart. Merge join two
-		// linked lists, preserving the ordering. Combine neighboring
+		// regionList is always sorted by resultStart. Merge join two linked lists, preserving the ordering. Combine neighboring
 		// regions to reduce the number of results seen by callers.
 		Region a = clearRegionList();
 		Region b = other.clearRegionList();

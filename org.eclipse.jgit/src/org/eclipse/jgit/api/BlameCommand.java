@@ -25,8 +25,7 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
 
 /**
- * Blame command for building a {@link org.eclipse.jgit.blame.BlameResult} for a
- * file path.
+ * Blame command for building a {@link org.eclipse.jgit.blame.BlameResult} for a file path.
  */
 public class BlameCommand extends GitCommand<BlameResult> {
 
@@ -101,10 +100,8 @@ public class BlameCommand extends GitCommand<BlameResult> {
 	/**
 	 * Enable (or disable) following file renames.
 	 * <p>
-	 * If true renames are followed using the standard FollowFilter behavior
-	 * used by RevWalk (which matches {@code git log --follow} in the C
-	 * implementation). This is not the same as copy/move detection as
-	 * implemented by the C implementation's of {@code git blame -M -C}.
+	 * If true renames are followed using the standard FollowFilter behavior used by RevWalk (which matches {@code git log --follow} in the C
+	 * implementation). This is not the same as copy/move detection as implemented by the C implementation's of {@code git blame -M -C}.
 	 *
 	 * @param follow
 	 *            enable following.
@@ -118,8 +115,7 @@ public class BlameCommand extends GitCommand<BlameResult> {
 	/**
 	 * {@inheritDoc}
 	 * <p>
-	 * Generate a list of lines with information about when the lines were
-	 * introduced into the file path.
+	 * Generate a list of lines with information about when the lines were introduced into the file path.
 	 */
 	@Override
 	public BlameResult call() throws GitAPIException {

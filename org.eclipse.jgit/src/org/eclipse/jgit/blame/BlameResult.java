@@ -19,10 +19,8 @@ import org.eclipse.jgit.revwalk.RevCommit;
 /**
  * Collects line annotations for inspection by applications.
  * <p>
- * A result is usually updated incrementally as the BlameGenerator digs back
- * further through history. Applications that want to lay annotations down text
- * to the original source file in a viewer may find the BlameResult structure an
- * easy way to acquire the information, at the expense of keeping tables in
+ * A result is usually updated incrementally as the BlameGenerator digs back further through history. Applications that want to lay annotations down text
+ * to the original source file in a viewer may find the BlameResult structure an easy way to acquire the information, at the expense of keeping tables in
  * memory tracking every line of the result file.
  * <p>
  * This class is not thread-safe.
@@ -31,10 +29,8 @@ import org.eclipse.jgit.revwalk.RevCommit;
  * <ul>
  * <li>result - The file whose lines are being examined. This is the revision
  * the user is trying to view blame/annotation information alongside of.</li>
- * <li>source - The file that was blamed with supplying one or more lines of
- * data into result. The source may be a different file path (due to copy or
- * rename). Source line numbers may differ from result line numbers due to lines
- * being added/removed in intermediate revisions.</li>
+ * <li>source - The file that was blamed with supplying one or more lines of data into result. The source may be a different file path (due to copy or
+ * rename). Source line numbers may differ from result line numbers due to lines being added/removed in intermediate revisions.</li>
  * </ul>
  */
 public class BlameResult {
@@ -145,8 +141,7 @@ public class BlameResult {
 	/**
 	 * Get the commit that provided the specified line of the result.
 	 * <p>
-	 * The source commit may be null if the line was blamed to an uncommitted
-	 * revision, such as the working tree copy, or during a reverse blame if the
+	 * The source commit may be null if the line was blamed to an uncommitted revision, such as the working tree copy, or during a reverse blame if the
 	 * line survives to the end revision (e.g. the branch tip).
 	 *
 	 * @param idx
@@ -224,8 +219,7 @@ public class BlameResult {
 	/**
 	 * Compute the next available segment and return the first index.
 	 * <p>
-	 * Computes one segment and returns to the caller the first index that is
-	 * available. After return the caller can also inspect {@link #lastLength()}
+	 * Computes one segment and returns to the caller the first index that is available. After return the caller can also inspect {@link #lastLength()}
 	 * to determine how many lines of the result were computed.
 	 *
 	 * @return index that is now available. -1 if no more are available.
@@ -288,8 +282,7 @@ public class BlameResult {
 
 			loadFrom(gen);
 
-			// If the result contains either end of our current range bounds,
-			// update the bounds to avoid scanning that section during the
+			// If the result contains either end of our current range bounds, update the bounds to avoid scanning that section during the
 			// next loop iteration.
 
 			int resLine = gen.getResultStart();
@@ -323,8 +316,7 @@ public class BlameResult {
 
 		for (; resLine < resEnd; resLine++) {
 			// Reverse blame can generate multiple results for the same line.
-			// Favor the first one selected, as this is the oldest and most
-			// likely to be nearest to the inquiry made by the user.
+			// Favor the first one selected, as this is the oldest and most likely to be nearest to the inquiry made by the user.
 			if (sourceLines[resLine] != 0)
 				continue;
 
@@ -333,8 +325,7 @@ public class BlameResult {
 			sourceCommitters[resLine] = srcCommitter;
 			sourcePaths[resLine] = srcPath;
 
-			// Since sourceLines is 1-based to permit hasSourceData to use 0 to
-			// mean the line has not been annotated yet, pre-increment instead
+			// Since sourceLines is 1-based to permit hasSourceData to use 0 to mean the line has not been annotated yet, pre-increment instead
 			// of the traditional post-increment when making the assignment.
 			sourceLines[resLine] = ++srcLine;
 		}

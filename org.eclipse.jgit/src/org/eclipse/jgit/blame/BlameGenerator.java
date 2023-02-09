@@ -52,77 +52,52 @@ import static org.eclipse.jgit.lib.FileMode.TYPE_MASK;
 /**
  * Generate author information for lines based on a provided file.
  * <p>
- * Applications that want a simple one-shot computation of blame for a file
- * should use {@link #computeBlameResult()} to prepare the entire result in one
- * method call. This may block for significant time as the history of the
- * repository must be traversed until information is gathered for every line.
+ * Applications that want a simple one-shot computation of blame for a file should use {@link #computeBlameResult()} to prepare the entire result in one
+ * method call. This may block for significant time as the history of the repository must be traversed until information is gathered for every line.
  * <p>
- * Applications that want more incremental update behavior may use either the
- * raw {@link #next()} streaming approach supported by this class, or construct
- * a {@link org.eclipse.jgit.blame.BlameResult} using
- * {@link org.eclipse.jgit.blame.BlameResult#create(BlameGenerator)} and
- * incrementally construct the result with
- * {@link org.eclipse.jgit.blame.BlameResult#computeNext()}.
+ * Applications that want more incremental update behavior may use either the raw {@link #next()} streaming approach supported by this class, or construct
+ * a {@link org.eclipse.jgit.blame.BlameResult} using {@link org.eclipse.jgit.blame.BlameResult#create(BlameGenerator)} and
+ * incrementally construct the result with {@link org.eclipse.jgit.blame.BlameResult#computeNext()}.
  * <p>
  * This class is not thread-safe.
  * <p>
- * An instance of BlameGenerator can only be used once. To blame multiple files
- * the application must create a new BlameGenerator.
+ * An instance of BlameGenerator can only be used once. To blame multiple files the application must create a new BlameGenerator.
  * <p>
  * During blame processing there are two files involved:
  * <ul>
- * <li>result - The file whose lines are being examined. This is the revision
- * the user is trying to view blame/annotation information alongside of.</li>
- * <li>source - The file that was blamed with supplying one or more lines of
- * data into result. The source may be a different file path (due to copy or
- * rename). Source line numbers may differ from result line numbers due to lines
- * being added/removed in intermediate revisions.</li>
+ * <li>result - The file whose lines are being examined. This is the revision the user is trying to view blame/annotation information alongside of.</li>
+ * <li>source - The file that was blamed with supplying one or more lines of data into result. The source may be a different file path (due to copy or
+ * rename). Source line numbers may differ from result line numbers due to lines being added/removed in intermediate revisions.</li>
  * </ul>
  * <p>
- * The blame algorithm is implemented by initially assigning responsibility for
- * all lines of the result to the starting commit. A difference against the
- * commit's ancestor is computed, and responsibility is passed to the ancestor
- * commit for any lines that are common. The starting commit is blamed only for
- * the lines that do not appear in the ancestor, if any. The loop repeats using
- * the ancestor, until there are no more lines to acquire information on, or the
+ * The blame algorithm is implemented by initially assigning responsibility for all lines of the result to the starting commit. A difference against the
+ * commit's ancestor is computed, and responsibility is passed to the ancestor commit for any lines that are common. The starting commit is blamed only for
+ * the lines that do not appear in the ancestor, if any. The loop repeats using the ancestor, until there are no more lines to acquire information on, or the
  * file's creation point is discovered in history.
  */
 public class BlameGenerator implements AutoCloseable {
 	private final Repository repository;
-
 	private final PathFilter resultPath;
-
 	private final MutableObjectId idBuf;
-
 	/** Revision pool used to acquire commits from. */
 	private RevWalk revPool;
-
 	/** Indicates the commit was put into the queue at least once. */
 	private RevFlag SEEN;
-
 	private ObjectReader reader;
-
 	private TreeWalk treeWalk;
-
 	private DiffAlgorithm diffAlgorithm = new HistogramDiff();
-
 	private RawTextComparator textComparator = RawTextComparator.DEFAULT;
-
 	private RenameDetector renameDetector;
-
 	/** Potential candidates, sorted by commit time descending. */
 	private Candidate queue;
-
 	/** Number of lines that still need to be discovered. */
 	private int remaining;
-
 	/** Blame is currently assigned to this source. */
 	private Candidate outCandidate;
 	private Region outRegion;
 
 	/**
-	 * Create a blame generator for the repository and path (relative to
-	 * repository)
+	 * Create a blame generator for the repository and path (relative to repository)
 	 *
 	 * @param repository
 	 *            repository to access revision data from.
@@ -201,10 +176,8 @@ public class BlameGenerator implements AutoCloseable {
 	/**
 	 * Enable (or disable) following file renames, on by default.
 	 * <p>
-	 * If true renames are followed using the standard FollowFilter behavior
-	 * used by RevWalk (which matches {@code git log --follow} in the C
-	 * implementation). This is not the same as copy/move detection as
-	 * implemented by the C implementation's of {@code git blame -M -C}.
+	 * If true renames are followed using the standard FollowFilter behavior used by RevWalk (which matches {@code git log --follow} in the C
+	 * implementation). This is not the same as copy/move detection as implemented by the C implementation's of {@code git blame -M -C}.
 	 *
 	 * @param follow
 	 *            enable following.
@@ -219,8 +192,7 @@ public class BlameGenerator implements AutoCloseable {
 	}
 
 	/**
-	 * Obtain the RenameDetector, allowing the application to configure its
-	 * settings for rename score and breaking behavior.
+	 * Obtain the RenameDetector, allowing the application to configure its settings for rename score and breaking behavior.
 	 *
 	 * @return the rename detector, or {@code null} if
 	 *         {@code setFollowFileRenames(false)}.
@@ -231,10 +203,8 @@ public class BlameGenerator implements AutoCloseable {
 	}
 
 	/**
-	 * Pushes HEAD, index, and working tree as appropriate for blaming the file
-	 * given in the constructor {@link #BlameGenerator(Repository, String)}
-	 * against HEAD. Includes special handling in case the file is in conflict
-	 * state from an unresolved merge conflict.
+	 * Pushes HEAD, index, and working tree as appropriate for blaming the file given in the constructor {@link #BlameGenerator(Repository, String)}
+	 * against HEAD. Includes special handling in case the file is in conflict state from an unresolved merge conflict.
 	 *
 	 * @return {@code this}
 	 * @throws NoHeadException
@@ -264,8 +234,7 @@ public class BlameGenerator implements AutoCloseable {
 			if (!walk.next()) {
 				return this;
 			}
-			DirCacheIterator dcIter = walk.getTree(indexTree,
-					DirCacheIterator.class);
+			DirCacheIterator dcIter = walk.getTree(indexTree, DirCacheIterator.class);
 			if (dcIter == null) {
 				// Not found in index
 				return this;
@@ -308,8 +277,7 @@ public class BlameGenerator implements AutoCloseable {
 	 * Push a candidate object onto the generator's traversal stack.
 	 * <p>
 	 * Candidates should be pushed in history order from oldest-to-newest.
-	 * Applications should push the starting commit first, then the index
-	 * revision (if the index is interesting), and finally the working tree copy
+	 * Applications should push the starting commit first, then the index revision (if the index is interesting), and finally the working tree copy
 	 * (if the working tree is interesting).
 	 *
 	 * @param id
@@ -365,10 +333,8 @@ public class BlameGenerator implements AutoCloseable {
 	/**
 	 * Step the blame algorithm one iteration.
 	 *
-	 * @return true if the generator has found a region's source. The getSource*
-	 *         and {@link #getResultStart()}, {@link #getResultEnd()} methods
-	 *         can be used to inspect the region found. False if there are no
-	 *         more regions to describe.
+	 * @return true if the generator has found a region's source. The getSource* and {@link #getResultStart()}, {@link #getResultEnd()} methods
+	 *         can be used to inspect the region found. False if there are no more regions to describe.
 	 * @throws java.io.IOException
 	 *             repository cannot be read.
 	 */
@@ -389,8 +355,7 @@ public class BlameGenerator implements AutoCloseable {
 			outRegion = null;
 		}
 
-		// If there are no lines remaining, the entire result is done,
-		// even if there are revisions still available for the path.
+		// If there are no lines remaining, the entire result is done, even if there are revisions still available for the path.
 		if (remaining == 0)
 			return done();
 
@@ -428,15 +393,6 @@ public class BlameGenerator implements AutoCloseable {
 		return outRegion != null;
 	}
 
-	private boolean reverseResult(Candidate parent, Candidate source) throws IOException {
-		// On a reverse blame present the application the parent
-		// (as this is what did the removals), however the region
-		// list to enumerate is the source's surviving list.
-		Candidate res = parent.copy(parent.sourceCommit);
-		res.regionList = source.regionList;
-		return result(res);
-	}
-
 	private Candidate pop() {
 		Candidate n = queue;
 		if (n != null) {
@@ -448,16 +404,13 @@ public class BlameGenerator implements AutoCloseable {
 
 	private void push(Candidate toInsert) {
 		if (toInsert.has(SEEN)) {
-			// We have already added a Candidate for this commit to the queue,
-			// this can happen if the commit is a merge base for two or more
+			// We have already added a Candidate for this commit to the queue, this can happen if the commit is a merge base for two or more
 			// parallel branches that were merged together.
 			//
-			// It is likely the candidate was not yet processed. The queue
-			// sorts descending by commit time and usually descendant commits
+			// It is likely the candidate was not yet processed. The queue sorts descending by commit time and usually descendant commits
 			// have higher timestamps than the ancestors.
 			//
-			// Find the existing candidate and merge the new candidate's
-			// region list into it.
+			// Find the existing candidate and merge the new candidate's region list into it.
 			for (Candidate p = queue; p != null; p = p.queueNext) {
 				if (p.canMergeRegions(toInsert)) {
 					p.mergeRegions(toInsert);
@@ -467,8 +420,7 @@ public class BlameGenerator implements AutoCloseable {
 		}
 		toInsert.add(SEEN);
 
-		// Insert into the queue using descending commit time, so
-		// the most recent commit will pop next.
+		// Insert into the queue using descending commit time, so the most recent commit will pop next.
 		int time = toInsert.getTime();
 		Candidate n = queue;
 		if (n == null || time >= n.getTime()) {
@@ -507,8 +459,7 @@ public class BlameGenerator implements AutoCloseable {
 			return result(n);
 
 		if (0 == r.getOldId().prefixCompare(n.sourceBlob)) {
-			// A 100% rename without any content change can also
-			// skip directly to the parent.
+			// A 100% rename without any content change can also skip directly to the parent.
 			n.sourceCommit = parent;
 			n.sourcePath = PathFilter.create(r.getOldPath());
 			push(n);
@@ -539,8 +490,7 @@ public class BlameGenerator implements AutoCloseable {
 	private boolean split(Candidate parent, Candidate source) throws IOException {
 		EditList editList = diffAlgorithm.diff(textComparator, parent.sourceText, source.sourceText);
 		if (editList.isEmpty()) {
-			// Ignoring whitespace (or some other special comparator) can
-			// cause non-identical blobs to have an empty edit list. In
+			// Ignoring whitespace (or some other special comparator) can cause non-identical blobs to have an empty edit list. In
 			// a case like this push the parent alone.
 			parent.regionList = source.regionList;
 			push(parent);
@@ -559,8 +509,7 @@ public class BlameGenerator implements AutoCloseable {
 	private boolean processMerge(Candidate n) throws IOException {
 		int pCnt = n.getParentCount();
 
-		// If any single parent exactly matches the merge, follow only
-		// that one parent through history.
+		// If any single parent exactly matches the merge, follow only that one parent through history.
 		ObjectId[] ids = null;
 		for (int pIdx = 0; pIdx < pCnt; pIdx++) {
 			RevCommit parent = n.getParent(pIdx);
@@ -587,12 +536,9 @@ public class BlameGenerator implements AutoCloseable {
 					continue;
 
 				if (0 == r.getOldId().prefixCompare(n.sourceBlob)) {
-					// A 100% rename without any content change can also
-					// skip directly to the parent. Note this bypasses an
-					// earlier parent that had the path (above) but did not
-					// have an exact content match. For performance reasons
-					// we choose to follow the one parent over trying to do
-					// possibly both parents.
+					// A 100% rename without any content change can also skip directly to the parent. Note this bypasses an
+					// earlier parent that had the path (above) but did not have an exact content match. For performance reasons
+					// we choose to follow the one parent over trying to do possibly both parents.
 					n.sourcePath = PathFilter.create(r.getOldPath());
 					return blameEntireRegionOnParent(n, parent);
 				}
@@ -633,8 +579,7 @@ public class BlameGenerator implements AutoCloseable {
 
 			p.takeBlame(editList, n);
 
-			// Only remember this parent candidate if there is at least
-			// one region that was blamed on the parent.
+			// Only remember this parent candidate if there is at least one region that was blamed on the parent.
 			if (p.regionList != null) {
 				parents[pIdx] = p;
 			}
@@ -654,8 +599,7 @@ public class BlameGenerator implements AutoCloseable {
 	/**
 	 * Get the revision blamed for the current region.
 	 * <p>
-	 * The source commit may be null if the line was blamed to an uncommitted
-	 * revision, such as the working tree copy, or during a reverse blame if the
+	 * The source commit may be null if the line was blamed to an uncommitted revision, such as the working tree copy, or during a reverse blame if the
 	 * line survives to the end revision (e.g. the branch tip).
 	 *
 	 * @return current revision being blamed.
@@ -702,8 +646,7 @@ public class BlameGenerator implements AutoCloseable {
 	}
 
 	/**
-	 * Get first line of the source data that has been blamed for the current
-	 * region
+	 * Get first line of the source data that has been blamed for the current region
 	 *
 	 * @return first line of the source data that has been blamed for the
 	 *         current region. This is line number of where the region was added
@@ -715,8 +658,7 @@ public class BlameGenerator implements AutoCloseable {
 	}
 
 	/**
-	 * Get one past the range of the source data that has been blamed for the
-	 * current region
+	 * Get one past the range of the source data that has been blamed for the current region
 	 *
 	 * @return one past the range of the source data that has been blamed for
 	 *         the current region. This is line number of where the region was
@@ -729,8 +671,7 @@ public class BlameGenerator implements AutoCloseable {
 	}
 
 	/**
-	 * Get first line of the result that {@link #getSourceCommit()} has been
-	 * blamed for providing
+	 * Get first line of the result that {@link #getSourceCommit()} has been blamed for providing
 	 *
 	 * @return first line of the result that {@link #getSourceCommit()} has been
 	 *         blamed for providing. Line numbers use 0 based indexing.
@@ -740,8 +681,7 @@ public class BlameGenerator implements AutoCloseable {
 	}
 
 	/**
-	 * Get one past the range of the result that {@link #getSourceCommit()} has
-	 * been blamed for providing
+	 * Get one past the range of the result that {@link #getSourceCommit()} has been blamed for providing
 	 *
 	 * @return one past the range of the result that {@link #getSourceCommit()}
 	 *         has been blamed for providing. Line numbers use 0 based indexing.
@@ -755,8 +695,7 @@ public class BlameGenerator implements AutoCloseable {
 	}
 
 	/**
-	 * Get number of lines in the current region being blamed to
-	 * {@link #getSourceCommit()}
+	 * Get number of lines in the current region being blamed to {@link #getSourceCommit()}
 	 *
 	 * @return number of lines in the current region being blamed to
 	 *         {@link #getSourceCommit()}. This is always the value of the
@@ -768,8 +707,7 @@ public class BlameGenerator implements AutoCloseable {
 	}
 
 	/**
-	 * Get complete contents of the source file blamed for the current output
-	 * region
+	 * Get complete contents of the source file blamed for the current output region
 	 *
 	 * @return complete contents of the source file blamed for the current
 	 *         output region. This is the contents of {@link #getSourcePath()}
