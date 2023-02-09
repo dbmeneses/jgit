@@ -699,7 +699,6 @@ public class BlameGenerator implements AutoCloseable {
 	}
 
 	private static boolean isRename(DiffEntry ent) {
-		return ent.getChangeType() == ChangeType.RENAME
-				|| ent.getChangeType() == ChangeType.COPY;
+		return ent.getChangeType() == ChangeType.RENAME || ent.getChangeType() == ChangeType.COPY;
 	}
 }
