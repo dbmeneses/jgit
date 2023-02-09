@@ -216,58 +216,8 @@ public class BlameGenerator implements AutoCloseable {
 		if (head == null) {
 			throw new NoHeadException(MessageFormat.format(JGitText.get().noSuchRefKnown, Constants.HEAD));
 		}
-		if (repo.isBare()) {
-			return push(head);
-		}
-		DirCache dc = repo.readDirCache();
-		try (TreeWalk walk = new TreeWalk(repo)) {
-			walk.setOperationType(OperationType.CHECKIN_OP);
-			FileTreeIterator iter = new FileTreeIterator(repo);
-			int fileTree = walk.addTree(iter);
-			int indexTree = walk.addTree(new DirCacheIterator(dc));
-			iter.setDirCacheIterator(walk, indexTree);
-			walk.setFilter(resultPath);
-			walk.setRecursive(true);
-			if (!walk.next()) {
-				return this;
-			}
-			DirCacheIterator dcIter = walk.getTree(indexTree, DirCacheIterator.class);
-			if (dcIter == null) {
-				// Not found in index
-				return this;
-			}
-			iter = walk.getTree(fileTree, FileTreeIterator.class);
-			if (iter == null || !isFile(iter.getEntryRawMode())) {
-				return this;
-			}
-			long filteredLength = iter.getEntryContentLength();
-			try (InputStream stream = iter.openEntryStream()) {
-				RawText inTree = new RawText(getBytes(iter.getEntryFile().getPath(), stream, filteredLength));
-			}
-			DirCacheEntry indexEntry = dcIter.getDirCacheEntry();
-			if (indexEntry.getStage() == DirCacheEntry.STAGE_0) {
-				push(head);
-			} else {
-				throw new IllegalStateException("Stage is not 0");
-			}
-		}
+		push(head);
 		return this;
-	}
-
-	private static byte[] getBytes(String path, InputStream in, long maxLength) throws IOException {
-		if (maxLength > Integer.MAX_VALUE) {
-			throw new IOException(
-					MessageFormat.format(JGitText.get().fileIsTooLarge, path));
-		}
-		int max = (int) maxLength;
-		byte[] buffer = new byte[max];
-		int read = IO.readFully(in, buffer, 0);
-		if (read == max) {
-			return buffer;
-		}
-		byte[] copy = new byte[read];
-		System.arraycopy(buffer, 0, copy, 0, read);
-		return copy;
 	}
 
 	/**
