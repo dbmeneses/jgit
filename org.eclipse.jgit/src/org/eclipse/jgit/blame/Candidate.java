@@ -117,15 +117,6 @@ class Candidate {
 		return new Candidate(repo, commit, path);
 	}
 
-	Candidate copy(RevCommit commit) {
-		Candidate r = create(sourceRepository, commit, sourcePath);
-		r.sourceBlob = sourceBlob;
-		r.sourceText = sourceText;
-		r.regionList = regionList;
-		r.renameScore = renameScore;
-		return r;
-	}
-
 	void loadText(ObjectReader reader) throws IOException {
 		ObjectLoader ldr = LfsFactory.getInstance().applySmudgeFilter(sourceRepository,
 				reader.open(sourceBlob, Constants.OBJ_BLOB),

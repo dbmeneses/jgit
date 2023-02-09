@@ -39,12 +39,9 @@ import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.treewalk.FileTreeIterator;
 import org.eclipse.jgit.treewalk.TreeWalk;
-import org.eclipse.jgit.treewalk.TreeWalk.OperationType;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
-import org.eclipse.jgit.util.IO;
 
 import static org.eclipse.jgit.lib.FileMode.TYPE_FILE;
 import static org.eclipse.jgit.lib.FileMode.TYPE_MASK;
@@ -441,8 +438,6 @@ public class BlameGenerator implements AutoCloseable {
 
 	private boolean processOne(Candidate n) throws IOException {
 		RevCommit parent = n.getParent(0);
-		if (parent == null)
-			return split(n.getNextCandidate(0), n);
 		revPool.parseHeaders(parent);
 
 		if (find(parent, n.sourcePath)) {
@@ -618,16 +613,6 @@ public class BlameGenerator implements AutoCloseable {
 	}
 
 	/**
-	 * Get source committer
-	 *
-	 * @return current committer being blamed
-	 */
-	public PersonIdent getSourceCommitter() {
-		RevCommit c = getSourceCommit();
-		return c != null ? c.getCommitterIdent() : null;
-	}
-
-	/**
 	 * Get source path
 	 *
 	 * @return path of the file being blamed
@@ -707,31 +692,14 @@ public class BlameGenerator implements AutoCloseable {
 	}
 
 	/**
-	 * Get complete contents of the source file blamed for the current output region
-	 *
-	 * @return complete contents of the source file blamed for the current
-	 *         output region. This is the contents of {@link #getSourcePath()}
-	 *         within {@link #getSourceCommit()}. The source contents is
-	 *         temporarily available as an artifact of the blame algorithm. Most
-	 *         applications will want the result contents for display to users.
-	 */
-	public RawText getSourceContents() {
-		return outCandidate.sourceText;
-	}
-
-	/**
 	 * Get complete file contents of the result file blame is annotating
 	 *
 	 * @return complete file contents of the result file blame is annotating.
 	 *         This value is accessible only after being configured and only
 	 *         immediately before the first call to {@link #next()}. Returns
 	 *         null if the path does not exist.
-	 * @throws java.io.IOException
-	 *             repository cannot be read.
-	 * @throws java.lang.IllegalStateException
-	 *             {@link #next()} has already been invoked.
 	 */
-	public RawText getResultContents() throws IOException {
+	public RawText getResultContents() {
 		return queue != null ? queue.sourceText : null;
 	}
 
