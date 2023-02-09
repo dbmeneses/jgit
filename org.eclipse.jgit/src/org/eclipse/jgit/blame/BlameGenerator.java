@@ -10,24 +10,12 @@
 
 package org.eclipse.jgit.blame;
 
-import static org.eclipse.jgit.lib.Constants.OBJ_BLOB;
-import static org.eclipse.jgit.lib.FileMode.TYPE_FILE;
-import static org.eclipse.jgit.lib.FileMode.TYPE_MASK;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
-
 import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.api.errors.NoHeadException;
-import org.eclipse.jgit.blame.Candidate.BlobCandidate;
-import org.eclipse.jgit.blame.Candidate.HeadCandidate;
-import org.eclipse.jgit.blame.Candidate.ReverseCandidate;
-import org.eclipse.jgit.blame.ReverseWalk.ReverseCommit;
 import org.eclipse.jgit.diff.DiffAlgorithm;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffEntry.ChangeType;
@@ -39,14 +27,12 @@ import org.eclipse.jgit.diff.RenameDetector;
 import org.eclipse.jgit.dircache.DirCache;
 import org.eclipse.jgit.dircache.DirCacheEntry;
 import org.eclipse.jgit.dircache.DirCacheIterator;
-import org.eclipse.jgit.errors.NoWorkTreeException;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.internal.diff.FilteredRenameDetector;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectLoader;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
@@ -59,6 +45,9 @@ import org.eclipse.jgit.treewalk.TreeWalk.OperationType;
 import org.eclipse.jgit.treewalk.filter.PathFilter;
 import org.eclipse.jgit.treewalk.filter.TreeFilter;
 import org.eclipse.jgit.util.IO;
+
+import static org.eclipse.jgit.lib.FileMode.TYPE_FILE;
+import static org.eclipse.jgit.lib.FileMode.TYPE_MASK;
 
 /**
  * Generate author information for lines based on a provided file.
@@ -147,22 +136,19 @@ public class BlameGenerator implements AutoCloseable {
 
 		idBuf = new MutableObjectId();
 		setFollowFileRenames(true);
-		initRevPool(false);
+		initRevPool();
 
 		remaining = -1;
 	}
 
-	private void initRevPool(boolean reverse) {
+	private void initRevPool() {
 		if (queue != null)
 			throw new IllegalStateException();
 
 		if (revPool != null)
 			revPool.close();
 
-		if (reverse)
-			revPool = new ReverseWalk(getRepository());
-		else
-			revPool = new RevWalk(getRepository());
+		revPool = new RevWalk(getRepository());
 
 		SEEN = revPool.newFlag("SEEN"); //$NON-NLS-1$
 		reader = revPool.getObjectReader();
@@ -245,56 +231,6 @@ public class BlameGenerator implements AutoCloseable {
 	}
 
 	/**
-	 * Push a candidate blob onto the generator's traversal stack.
-	 * <p>
-	 * Candidates should be pushed in history order from oldest-to-newest.
-	 * Applications should push the starting commit first, then the index
-	 * revision (if the index is interesting), and finally the working tree copy
-	 * (if the working tree is interesting).
-	 *
-	 * @param description
-	 *            description of the blob revision, such as "Working Tree".
-	 * @param contents
-	 *            contents of the file.
-	 * @return {@code this}
-	 * @throws java.io.IOException
-	 *             the repository cannot be read.
-	 */
-	public BlameGenerator push(String description, byte[] contents)
-			throws IOException {
-		return push(description, new RawText(contents));
-	}
-
-	/**
-	 * Push a candidate blob onto the generator's traversal stack.
-	 * <p>
-	 * Candidates should be pushed in history order from oldest-to-newest.
-	 * Applications should push the starting commit first, then the index
-	 * revision (if the index is interesting), and finally the working tree copy
-	 * (if the working tree is interesting).
-	 *
-	 * @param description
-	 *            description of the blob revision, such as "Working Tree".
-	 * @param contents
-	 *            contents of the file.
-	 * @return {@code this}
-	 * @throws java.io.IOException
-	 *             the repository cannot be read.
-	 */
-	public BlameGenerator push(String description, RawText contents)
-			throws IOException {
-		if (description == null)
-			description = JGitText.get().blameNotCommittedYet;
-		BlobCandidate c = new BlobCandidate(getRepository(), description,
-				resultPath);
-		c.sourceText = contents;
-		c.regionList = new Region(0, 0, contents.size());
-		remaining = contents.size();
-		push(c);
-		return this;
-	}
-
-	/**
 	 * Pushes HEAD, index, and working tree as appropriate for blaming the file
 	 * given in the constructor {@link #BlameGenerator(Repository, String)}
 	 * against HEAD. Includes special handling in case the file is in conflict
@@ -311,11 +247,10 @@ public class BlameGenerator implements AutoCloseable {
 		Repository repo = getRepository();
 		ObjectId head = repo.resolve(Constants.HEAD);
 		if (head == null) {
-			throw new NoHeadException(MessageFormat
-					.format(JGitText.get().noSuchRefKnown, Constants.HEAD));
+			throw new NoHeadException(MessageFormat.format(JGitText.get().noSuchRefKnown, Constants.HEAD));
 		}
 		if (repo.isBare()) {
-			return push(null, head);
+			return push(head);
 		}
 		DirCache dc = repo.readDirCache();
 		try (TreeWalk walk = new TreeWalk(repo)) {
@@ -339,47 +274,21 @@ public class BlameGenerator implements AutoCloseable {
 			if (iter == null || !isFile(iter.getEntryRawMode())) {
 				return this;
 			}
-			RawText inTree;
 			long filteredLength = iter.getEntryContentLength();
 			try (InputStream stream = iter.openEntryStream()) {
-				inTree = new RawText(getBytes(iter.getEntryFile().getPath(),
-						stream, filteredLength));
+				RawText inTree = new RawText(getBytes(iter.getEntryFile().getPath(), stream, filteredLength));
 			}
 			DirCacheEntry indexEntry = dcIter.getDirCacheEntry();
 			if (indexEntry.getStage() == DirCacheEntry.STAGE_0) {
-				push(null, head);
-				push(null, indexEntry.getObjectId());
-				push(null, inTree);
+				push(head);
 			} else {
-				// Create a special candidate using the working tree file as
-				// blob and HEAD and the MERGE_HEADs as parents.
-				HeadCandidate c = new HeadCandidate(getRepository(), resultPath,
-						getHeads(repo, head));
-				c.sourceText = inTree;
-				c.regionList = new Region(0, 0, inTree.size());
-				remaining = inTree.size();
-				push(c);
+				throw new IllegalStateException("Stage is not 0");
 			}
 		}
 		return this;
 	}
 
-	private List<RevCommit> getHeads(Repository repo, ObjectId head)
-			throws NoWorkTreeException, IOException {
-		List<ObjectId> mergeIds = repo.readMergeHeads();
-		if (mergeIds == null || mergeIds.isEmpty()) {
-			return Collections.singletonList(revPool.parseCommit(head));
-		}
-		List<RevCommit> heads = new ArrayList<>(mergeIds.size() + 1);
-		heads.add(revPool.parseCommit(head));
-		for (ObjectId id : mergeIds) {
-			heads.add(revPool.parseCommit(id));
-		}
-		return heads;
-	}
-
-	private static byte[] getBytes(String path, InputStream in, long maxLength)
-			throws IOException {
+	private static byte[] getBytes(String path, InputStream in, long maxLength) throws IOException {
 		if (maxLength > Integer.MAX_VALUE) {
 			throw new IOException(
 					MessageFormat.format(JGitText.get().fileIsTooLarge, path));
@@ -403,120 +312,18 @@ public class BlameGenerator implements AutoCloseable {
 	 * revision (if the index is interesting), and finally the working tree copy
 	 * (if the working tree is interesting).
 	 *
-	 * @param description
-	 *            description of the blob revision, such as "Working Tree".
 	 * @param id
 	 *            may be a commit or a blob.
 	 * @return {@code this}
 	 * @throws java.io.IOException
 	 *             the repository cannot be read.
 	 */
-	public BlameGenerator push(String description, AnyObjectId id)
-			throws IOException {
-		ObjectLoader ldr = reader.open(id);
-		if (ldr.getType() == OBJ_BLOB) {
-			if (description == null)
-				description = JGitText.get().blameNotCommittedYet;
-			BlobCandidate c = new BlobCandidate(getRepository(), description,
-					resultPath);
-			c.sourceBlob = id.toObjectId();
-			c.sourceText = new RawText(ldr.getCachedBytes(Integer.MAX_VALUE));
-			c.regionList = new Region(0, 0, c.sourceText.size());
-			remaining = c.sourceText.size();
-			push(c);
-			return this;
-		}
-
+	public BlameGenerator push(AnyObjectId id) throws IOException {
 		RevCommit commit = revPool.parseCommit(id);
 		if (!find(commit, resultPath))
 			return this;
 
 		Candidate c = new Candidate(getRepository(), commit, resultPath);
-		c.sourceBlob = idBuf.toObjectId();
-		c.loadText(reader);
-		c.regionList = new Region(0, 0, c.sourceText.size());
-		remaining = c.sourceText.size();
-		push(c);
-		return this;
-	}
-
-	/**
-	 * Configure the generator to compute reverse blame (history of deletes).
-	 * <p>
-	 * This method is expensive as it immediately runs a RevWalk over the
-	 * history spanning the expression {@code start..end} (end being more recent
-	 * than start) and then performs the equivalent operation as
-	 * {@link #push(String, AnyObjectId)} to begin blame traversal from the
-	 * commit named by {@code start} walking forwards through history until
-	 * {@code end} blaming line deletions.
-	 * <p>
-	 * A reverse blame may produce multiple sources for the same result line,
-	 * each of these is a descendant commit that removed the line, typically
-	 * this occurs when the same deletion appears in multiple side branches such
-	 * as due to a cherry-pick. Applications relying on reverse should use
-	 * {@link org.eclipse.jgit.blame.BlameResult} as it filters these duplicate
-	 * sources and only remembers the first (oldest) deletion.
-	 *
-	 * @param start
-	 *            oldest commit to traverse from. The result file will be loaded
-	 *            from this commit's tree.
-	 * @param end
-	 *            most recent commit to stop traversal at. Usually an active
-	 *            branch tip, tag, or HEAD.
-	 * @return {@code this}
-	 * @throws java.io.IOException
-	 *             the repository cannot be read.
-	 */
-	public BlameGenerator reverse(AnyObjectId start, AnyObjectId end)
-			throws IOException {
-		return reverse(start, Collections.singleton(end.toObjectId()));
-	}
-
-	/**
-	 * Configure the generator to compute reverse blame (history of deletes).
-	 * <p>
-	 * This method is expensive as it immediately runs a RevWalk over the
-	 * history spanning the expression {@code start..end} (end being more recent
-	 * than start) and then performs the equivalent operation as
-	 * {@link #push(String, AnyObjectId)} to begin blame traversal from the
-	 * commit named by {@code start} walking forwards through history until
-	 * {@code end} blaming line deletions.
-	 * <p>
-	 * A reverse blame may produce multiple sources for the same result line,
-	 * each of these is a descendant commit that removed the line, typically
-	 * this occurs when the same deletion appears in multiple side branches such
-	 * as due to a cherry-pick. Applications relying on reverse should use
-	 * {@link org.eclipse.jgit.blame.BlameResult} as it filters these duplicate
-	 * sources and only remembers the first (oldest) deletion.
-	 *
-	 * @param start
-	 *            oldest commit to traverse from. The result file will be loaded
-	 *            from this commit's tree.
-	 * @param end
-	 *            most recent commits to stop traversal at. Usually an active
-	 *            branch tip, tag, or HEAD.
-	 * @return {@code this}
-	 * @throws java.io.IOException
-	 *             the repository cannot be read.
-	 */
-	public BlameGenerator reverse(AnyObjectId start,
-			Collection<? extends ObjectId> end) throws IOException {
-		initRevPool(true);
-
-		ReverseCommit result = (ReverseCommit) revPool.parseCommit(start);
-		if (!find(result, resultPath))
-			return this;
-
-		revPool.markUninteresting(result);
-		for (ObjectId id : end)
-			revPool.markStart(revPool.parseCommit(id));
-
-		while (revPool.next() != null) {
-			// just pump the queue
-		}
-
-		ReverseCandidate c = new ReverseCandidate(getRepository(), result,
-				resultPath);
 		c.sourceBlob = idBuf.toObjectId();
 		c.loadText(reader);
 		c.regionList = new Region(0, 0, c.sourceText.size());
@@ -601,10 +408,6 @@ public class BlameGenerator implements AutoCloseable {
 				if (processMerge(n))
 					return true;
 
-			} else if (n instanceof ReverseCandidate) {
-				// Do not generate a tip of a reverse. The region
-				// survives and should not appear to be deleted.
-
 			} else /* if (pCnt == 0) */{
 				// Root commit, with at least one surviving region.
 				// Assign the remaining blame here.
@@ -625,8 +428,7 @@ public class BlameGenerator implements AutoCloseable {
 		return outRegion != null;
 	}
 
-	private boolean reverseResult(Candidate parent, Candidate source)
-			throws IOException {
+	private boolean reverseResult(Candidate parent, Candidate source) throws IOException {
 		// On a reverse blame present the application the parent
 		// (as this is what did the removals), however the region
 		// list to enumerate is the source's surviving list.
@@ -642,16 +444,6 @@ public class BlameGenerator implements AutoCloseable {
 			n.queueNext = null;
 		}
 		return n;
-	}
-
-	private void push(BlobCandidate toInsert) {
-		Candidate c = queue;
-		if (c != null) {
-			c.remove(SEEN); // will be pushed by toInsert
-			c.regionList = null;
-			toInsert.parent = c;
-		}
-		queue = toInsert;
 	}
 
 	private void push(Candidate toInsert) {
@@ -723,8 +515,7 @@ public class BlameGenerator implements AutoCloseable {
 			return false;
 		}
 
-		Candidate next = n.create(getRepository(), parent,
-				PathFilter.create(r.getOldPath()));
+		Candidate next = n.create(getRepository(), parent, PathFilter.create(r.getOldPath()));
 		next.sourceBlob = r.getOldId().toObjectId();
 		next.renameScore = r.getScore();
 		next.loadText(reader);
@@ -738,18 +529,15 @@ public class BlameGenerator implements AutoCloseable {
 		return false;
 	}
 
-	private boolean splitBlameWithParent(Candidate n, RevCommit parent)
-			throws IOException {
+	private boolean splitBlameWithParent(Candidate n, RevCommit parent) throws IOException {
 		Candidate next = n.create(getRepository(), parent, n.sourcePath);
 		next.sourceBlob = idBuf.toObjectId();
 		next.loadText(reader);
 		return split(next, n);
 	}
 
-	private boolean split(Candidate parent, Candidate source)
-			throws IOException {
-		EditList editList = diffAlgorithm.diff(textComparator,
-				parent.sourceText, source.sourceText);
+	private boolean split(Candidate parent, Candidate source) throws IOException {
+		EditList editList = diffAlgorithm.diff(textComparator, parent.sourceText, source.sourceText);
 		if (editList.isEmpty()) {
 			// Ignoring whitespace (or some other special comparator) can
 			// cause non-identical blobs to have an empty edit list. In
@@ -763,8 +551,6 @@ public class BlameGenerator implements AutoCloseable {
 		if (parent.regionList != null)
 			push(parent);
 		if (source.regionList != null) {
-			if (source instanceof ReverseCandidate)
-				return reverseResult(parent, source);
 			return result(source);
 		}
 		return false;
@@ -781,8 +567,7 @@ public class BlameGenerator implements AutoCloseable {
 			revPool.parseHeaders(parent);
 			if (!find(parent, n.sourcePath))
 				continue;
-			if (!(n instanceof ReverseCandidate) && idBuf.equals(n.sourceBlob))
-				return blameEntireRegionOnParent(n, parent);
+
 			if (ids == null)
 				ids = new ObjectId[pCnt];
 			ids[pIdx] = idBuf.toObjectId();
@@ -801,11 +586,7 @@ public class BlameGenerator implements AutoCloseable {
 				if (r == null)
 					continue;
 
-				if (n instanceof ReverseCandidate) {
-					if (ids == null)
-						ids = new ObjectId[pCnt];
-					ids[pCnt] = r.getOldId().toObjectId();
-				} else if (0 == r.getOldId().prefixCompare(n.sourceBlob)) {
+				if (0 == r.getOldId().prefixCompare(n.sourceBlob)) {
 					// A 100% rename without any content change can also
 					// skip directly to the parent. Note this bypasses an
 					// earlier parent that had the path (above) but did not
@@ -827,8 +608,7 @@ public class BlameGenerator implements AutoCloseable {
 
 			Candidate p;
 			if (renames != null && renames[pIdx] != null) {
-				p = n.create(getRepository(), parent,
-						PathFilter.create(renames[pIdx].getOldPath()));
+				p = n.create(getRepository(), parent, PathFilter.create(renames[pIdx].getOldPath()));
 				p.renameScore = renames[pIdx].getScore();
 				p.sourceBlob = renames[pIdx].getOldId().toObjectId();
 			} else if (ids != null && ids[pIdx] != null) {
@@ -839,26 +619,12 @@ public class BlameGenerator implements AutoCloseable {
 			}
 
 			EditList editList;
-			if (n instanceof ReverseCandidate
-					&& p.sourceBlob.equals(n.sourceBlob)) {
-				// This special case happens on ReverseCandidate forks.
-				p.sourceText = n.sourceText;
-				editList = new EditList(0);
-			} else {
+
 				p.loadText(reader);
-				editList = diffAlgorithm.diff(textComparator,
-						p.sourceText, n.sourceText);
-			}
+				editList = diffAlgorithm.diff(textComparator, p.sourceText, n.sourceText);
+
 
 			if (editList.isEmpty()) {
-				// Ignoring whitespace (or some other special comparator) can
-				// cause non-identical blobs to have an empty edit list. In
-				// a case like this push the parent alone.
-				if (n instanceof ReverseCandidate) {
-					parents[pIdx] = p;
-					continue;
-				}
-
 				p.regionList = n.regionList;
 				n.regionList = null;
 				parents[pIdx] = p;
@@ -870,51 +636,8 @@ public class BlameGenerator implements AutoCloseable {
 			// Only remember this parent candidate if there is at least
 			// one region that was blamed on the parent.
 			if (p.regionList != null) {
-				// Reverse blame requires inverting the regions. This puts
-				// the regions the parent deleted from us into the parent,
-				// and retains the common regions to look at other parents
-				// for deletions.
-				if (n instanceof ReverseCandidate) {
-					Region r = p.regionList;
-					p.regionList = n.regionList;
-					n.regionList = r;
-				}
-
 				parents[pIdx] = p;
 			}
-		}
-
-		if (n instanceof ReverseCandidate) {
-			// On a reverse blame report all deletions found in the children,
-			// and pass on to them a copy of our region list.
-			Candidate resultHead = null;
-			Candidate resultTail = null;
-
-			for (int pIdx = 0; pIdx < pCnt; pIdx++) {
-				Candidate p = parents[pIdx];
-				if (p == null)
-					continue;
-
-				if (p.regionList != null) {
-					Candidate r = p.copy(p.sourceCommit);
-					if (resultTail != null) {
-						resultTail.queueNext = r;
-						resultTail = r;
-					} else {
-						resultHead = r;
-						resultTail = r;
-					}
-				}
-
-				if (n.regionList != null) {
-					p.regionList = n.regionList.deepCopy();
-					push(p);
-				}
-			}
-
-			if (resultHead != null)
-				return result(resultHead);
-			return false;
 		}
 
 		// Push any parents that are still candidates.
@@ -1111,8 +834,7 @@ public class BlameGenerator implements AutoCloseable {
 		treeWalk.setFilter(TreeFilter.ANY_DIFF);
 		treeWalk.reset(parent.getTree(), commit.getTree());
 		List<DiffEntry> diffs = DiffEntry.scan(treeWalk);
-		FilteredRenameDetector filteredRenameDetector = new FilteredRenameDetector(
-				renameDetector);
+		FilteredRenameDetector filteredRenameDetector = new FilteredRenameDetector(renameDetector);
 		for (DiffEntry ent : filteredRenameDetector.compute(diffs, path)) {
 			if (isRename(ent) && ent.getNewPath().equals(path.getPath()))
 				return ent;

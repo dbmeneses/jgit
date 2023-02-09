@@ -138,24 +138,13 @@ class Blame extends TextBuiltin {
 			RevFlag scanned = generator.newFlag("SCANNED"); //$NON-NLS-1$
 			generator.setTextComparator(comparator);
 
-			if (!reverseRange.isEmpty()) {
-				RevCommit rangeStart = null;
-				List<RevCommit> rangeEnd = new ArrayList<>(2);
-				for (RevCommit c : reverseRange) {
-					if (c.has(RevFlag.UNINTERESTING)) {
-						rangeStart = c;
-					} else {
-						rangeEnd.add(c);
-					}
-				}
-				generator.reverse(rangeStart, rangeEnd);
-			} else if (revision != null) {
+			if (revision != null) {
 				ObjectId rev = db.resolve(revision + "^{commit}"); //$NON-NLS-1$
 				if (rev == null) {
 					throw die(MessageFormat.format(CLIText.get().noSuchRef,
 							revision));
 				}
-				generator.push(null, rev);
+				generator.push(rev);
 			} else {
 				generator.prepareHead();
 			}

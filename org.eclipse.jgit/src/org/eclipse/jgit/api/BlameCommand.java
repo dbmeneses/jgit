@@ -38,8 +38,6 @@ public class BlameCommand extends GitCommand<BlameResult> {
 
 	private ObjectId startCommit;
 
-	private Collection<ObjectId> reverseEndCommits;
-
 	private Boolean followFileRenames;
 
 	/**
@@ -118,44 +116,6 @@ public class BlameCommand extends GitCommand<BlameResult> {
 	}
 
 	/**
-	 * Configure the command to compute reverse blame (history of deletes).
-	 *
-	 * @param start
-	 *            oldest commit to traverse from. The result file will be loaded
-	 *            from this commit's tree.
-	 * @param end
-	 *            most recent commit to stop traversal at. Usually an active
-	 *            branch tip, tag, or HEAD.
-	 * @return {@code this}
-	 * @throws java.io.IOException
-	 *             the repository cannot be read.
-	 */
-	public BlameCommand reverse(AnyObjectId start, AnyObjectId end)
-			throws IOException {
-		return reverse(start, Collections.singleton(end.toObjectId()));
-	}
-
-	/**
-	 * Configure the generator to compute reverse blame (history of deletes).
-	 *
-	 * @param start
-	 *            oldest commit to traverse from. The result file will be loaded
-	 *            from this commit's tree.
-	 * @param end
-	 *            most recent commits to stop traversal at. Usually an active
-	 *            branch tip, tag, or HEAD.
-	 * @return {@code this}
-	 * @throws java.io.IOException
-	 *             the repository cannot be read.
-	 */
-	public BlameCommand reverse(AnyObjectId start, Collection<ObjectId> end)
-			throws IOException {
-		startCommit = start.toObjectId();
-		reverseEndCommits = new ArrayList<>(end);
-		return this;
-	}
-
-	/**
 	 * {@inheritDoc}
 	 * <p>
 	 * Generate a list of lines with information about when the lines were
@@ -172,10 +132,8 @@ public class BlameCommand extends GitCommand<BlameResult> {
 			if (followFileRenames != null)
 				gen.setFollowFileRenames(followFileRenames.booleanValue());
 
-			if (reverseEndCommits != null)
-				gen.reverse(startCommit, reverseEndCommits);
-			else if (startCommit != null)
-				gen.push(null, startCommit);
+			if (startCommit != null)
+				gen.push(startCommit);
 			else {
 				gen.prepareHead();
 			}

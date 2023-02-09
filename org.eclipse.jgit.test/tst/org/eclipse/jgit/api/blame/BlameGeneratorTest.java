@@ -37,7 +37,7 @@ public class BlameGeneratorTest extends RepositoryTestCase {
 			RevCommit c2 = git.commit().setMessage("create file").call();
 
 			try (BlameGenerator generator = new BlameGenerator(db, "file.txt")) {
-				generator.push(null, db.resolve(Constants.HEAD));
+				generator.push(db.resolve(Constants.HEAD));
 				assertEquals(3, generator.getResultContents().size());
 
 				assertTrue(generator.next());
@@ -88,7 +88,7 @@ public class BlameGeneratorTest extends RepositoryTestCase {
 			RevCommit c2 = git.commit().setMessage("change file2").call();
 
 			try (BlameGenerator generator = new BlameGenerator(db, FILENAME_2)) {
-				generator.push(null, db.resolve(Constants.HEAD));
+				generator.push(db.resolve(Constants.HEAD));
 				assertEquals(3, generator.getResultContents().size());
 
 				assertTrue(generator.next());
@@ -114,7 +114,7 @@ public class BlameGeneratorTest extends RepositoryTestCase {
 
 			// and test again with other BlameGenerator API:
 			try (BlameGenerator generator = new BlameGenerator(db, FILENAME_2)) {
-				generator.push(null, db.resolve(Constants.HEAD));
+				generator.push(db.resolve(Constants.HEAD));
 				BlameResult result = generator.computeBlameResult();
 
 				assertEquals(3, result.getResultContents().size());
@@ -151,7 +151,7 @@ public class BlameGeneratorTest extends RepositoryTestCase {
 			RevCommit c3 = git.commit().setMessage("create file").call();
 
 			try (BlameGenerator generator = new BlameGenerator(db, "file.txt")) {
-				generator.push(null, db.resolve(Constants.HEAD));
+				generator.push(db.resolve(Constants.HEAD));
 				assertEquals(3, generator.getResultContents().size());
 
 				assertTrue(generator.next());
