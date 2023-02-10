@@ -11,10 +11,10 @@
 package org.eclipse.jgit.blame2;
 
 import java.io.IOException;
+import org.eclipse.jgit.annotations.Nullable;
 import org.eclipse.jgit.diff.Edit;
 import org.eclipse.jgit.diff.EditList;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 
@@ -54,6 +54,7 @@ class FileCandidate {
 		return sourceBlob;
 	}
 
+	@Nullable
 	public Region getRegionList() {
 		return regionList;
 	}
@@ -62,7 +63,7 @@ class FileCandidate {
 		return sourcePath;
 	}
 
-	public void setRegionList(Region regionList) {
+	public void setRegionList(@Nullable Region regionList) {
 		this.regionList = regionList;
 	}
 

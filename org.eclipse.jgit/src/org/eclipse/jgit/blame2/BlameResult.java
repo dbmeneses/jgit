@@ -13,6 +13,10 @@ public class BlameResult {
     return fileBlameByPath.values();
   }
 
+  public void initialize(String path, int size) {
+    fileBlameByPath.put(path, new FileBlame(path, size));
+  }
+
   public void process(RevCommit commit, FileCandidate fileCandidate) {
     PersonIdent srcAuthor = commit.getAuthorIdent();
     int resLine = fileCandidate.getRegionList().resultStart;

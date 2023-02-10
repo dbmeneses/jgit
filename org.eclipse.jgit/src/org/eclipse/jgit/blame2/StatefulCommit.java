@@ -4,15 +4,15 @@ import java.util.Comparator;
 import java.util.Objects;
 import org.eclipse.jgit.revwalk.RevCommit;
 
-public class Commit {
-  public static final Comparator<Commit> TIME_COMPARATOR = Comparator
-    .comparingInt(Commit::getTime)
-    .thenComparing(Commit::getCommit);
+public class StatefulCommit {
+  public static final Comparator<StatefulCommit> TIME_COMPARATOR = Comparator
+    .comparingInt(StatefulCommit::getTime)
+    .thenComparing(StatefulCommit::getCommit);
 
   private final RevCommit sourceCommit;
   private final CommitFileIndex fileIndex;
 
-  Commit(RevCommit commit, CommitFileIndex fileIndex) {
+  StatefulCommit(RevCommit commit, CommitFileIndex fileIndex) {
     this.sourceCommit = commit;
     this.fileIndex = fileIndex;
   }
@@ -58,7 +58,7 @@ public class Commit {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    Commit that = (Commit) o;
+    StatefulCommit that = (StatefulCommit) o;
     return Objects.equals(sourceCommit, that.sourceCommit);
   }
 

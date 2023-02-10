@@ -10,7 +10,7 @@ import org.eclipse.jgit.lib.ObjectReader;
 /**
  * Reads the contents of a BLOB object (typically a file)
  */
-public class FileReader {
+public class BlobReader {
   public RawText loadText(ObjectReader objectReader, ObjectId objectId) {
     try {
       // TODO applySmudgeFilter?

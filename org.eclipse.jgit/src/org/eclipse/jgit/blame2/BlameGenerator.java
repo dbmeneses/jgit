@@ -2,50 +2,38 @@ package org.eclipse.jgit.blame2;
 
 import java.io.IOException;
 import java.text.MessageFormat;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
 import java.util.TreeSet;
-import java.util.stream.Collectors;
 import org.eclipse.jgit.api.errors.NoHeadException;
+import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
-import org.eclipse.jgit.treewalk.TreeWalk;
 
 public class BlameGenerator {
-  private final TreeSet<Commit> queue = new TreeSet<>(Commit.TIME_COMPARATOR);
+  private final TreeSet<StatefulCommit> queue = new TreeSet<>(StatefulCommit.TIME_COMPARATOR);
   private final Repository repository;
-  private BlameResult blameResult;
-  private final Collection<String> filePathsToBlame;
-  private final FileMatcher fileMatcher;
+  private final BlameResult blameResult;
   private final FileBlamer fileBlamer;
+  private final StatefulCommitFactory statefulCommitFactory;
 
   /**
    * Revision pool used to acquire commits from.
    */
   private RevWalk revPool;
-  private ObjectReader reader;
-  private TreeWalk treeWalk;
 
-  public BlameGenerator(Repository repository, BlameResult blameResult, Collection<String> filePathsToBlame) {
+  public BlameGenerator(Repository repository, BlameResult blameResult, StatefulCommitFactory statefulCommitFactory) {
     this.repository = repository;
-    this.fileMatcher = new FileMatcher(repository);
     this.blameResult = blameResult;
-    this.fileBlamer = new FileBlamer(new FileReader(), blameResult);
-    this.filePathsToBlame = filePathsToBlame;
+    this.fileBlamer = new FileBlamer(new BlobReader(), blameResult);
+    this.statefulCommitFactory = statefulCommitFactory;
     initRevPool();
   }
 
   private void initRevPool() {
     revPool = new RevWalk(repository);
-    reader = revPool.getObjectReader();
-    treeWalk = new TreeWalk(reader);
-    treeWalk.setRecursive(true);
   }
 
   public BlameGenerator prepareHead() throws NoHeadException, IOException {
@@ -54,25 +42,21 @@ public class BlameGenerator {
       throw new NoHeadException(MessageFormat.format(JGitText.get().noSuchRefKnown, Constants.HEAD));
     }
 
-    RevCommit commit = revPool.parseCommit(head);
-    List<FileCandidate> commitFiles = fileMatcher.getCommitFiles(commit)
-      .stream()
-      .map(f -> new FileCandidate(commit, f.getPath(), f.getObjectId()))
-      .collect(Collectors.toList());
+    RevCommit headCommit = revPool.parseCommit(head);
+    StatefulCommit statefulHeadCommit = statefulCommitFactory.create(headCommit);
 
-    for (FileCandidate fileCandidate : commitFiles) {
-      // TODO read number of lines. ALso report sizes to BlameResult?
-      fileCandidate.setRegionList();
+    for (FileCandidate fileCandidate : statefulHeadCommit.getFileIndex().getAll()) {
+      RawText rawText = blobReader.loadText(objectReader, fileCandidate.getBlob());
+
+      fileCandidate.setRegionList(new Region(0, 0, rawText.size()));
+      blameResult.initialize(fileCandidate.getPath(), rawText.size());
     }
-    
-    CommitFileIndex fileIndex = new CommitFileIndex(commitFiles);
-    Commit commitCandidate = new Commit(commit, fileIndex);
-    push(commitCandidate);
 
+    push(statefulHeadCommit);
     return this;
   }
 
-  public BlameGenerator push(Commit commitCandidate) {
+  public BlameGenerator push(StatefulCommit commitCandidate) {
     // TODO detect nodes already seen
     queue.add(commitCandidate);
     return this;
@@ -80,7 +64,7 @@ public class BlameGenerator {
 
   public boolean next() throws IOException {
     for (; ; ) {
-      Commit n = queue.pollFirst();
+      StatefulCommit n = queue.pollFirst();
       System.out.println("POLL: " + n);
       if (n == null) {
         return done();
@@ -104,16 +88,15 @@ public class BlameGenerator {
     return false;
   }
 
-  private void processOne(Commit n) throws IOException {
+  private void processOne(StatefulCommit n) throws IOException {
     RevCommit parentCommit = n.getParent();
     revPool.parseHeaders(parentCommit);
-    // TODO process regions
+    StatefulCommit parent = statefulCommitFactory.create(parentCommit);
+    fileBlamer.blame(revPool.getObjectReader(), parent, n);
 
-    Map<String, FileCandidate> parentFilesByPath = fileMatcher.getCommitFiles(parentCommit).stream()
-      .map(file -> new FileCandidate(parentCommit, file.getPath(), file.getObjectId()))
-      .collect(Collectors.toMap(FileCandidate::getPath, f -> f));
-
-    Commit parentCandidate = push(parentCommit);
+    if (!parent.getFileIndex().isEmpty()) {
+      push(parent);
+    }
 
     if (n.getCommit() == null) {
       // TODO not sure in what situation this can happen
@@ -123,6 +106,7 @@ public class BlameGenerator {
     // TODO: detection of rename
   }
 
-  private void processMerge(Commit commitCandidate) {
+  private void processMerge(StatefulCommit commitCandidate) {
+    // TODO
   }
 }

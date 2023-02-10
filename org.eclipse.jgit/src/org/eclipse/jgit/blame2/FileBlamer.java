@@ -7,14 +7,29 @@ import org.eclipse.jgit.diff.RawTextComparator;
 import org.eclipse.jgit.lib.ObjectReader;
 
 public class FileBlamer {
-  private final FileReader fileReader;
+  private final BlobReader fileReader;
   private final DiffAlgorithm diffAlgorithm = new HistogramDiff();
   private final RawTextComparator textComparator = RawTextComparator.DEFAULT;
   private final BlameResult blameResult;
 
-  public FileBlamer(FileReader fileReader, BlameResult blameResult) {
+  public FileBlamer(BlobReader fileReader, BlameResult blameResult) {
     this.fileReader = fileReader;
     this.blameResult = blameResult;
+  }
+
+  public void blame(ObjectReader objectReader, StatefulCommit parent, StatefulCommit source) {
+    for (FileCandidate sourceFile : source.getFileIndex().getAll()) {
+      FileCandidate parentFile = parent.getFileIndex().get(sourceFile.getPath());
+      if (parentFile != null) {
+        splitBlameWithParent(objectReader, parentFile, sourceFile);
+      }
+
+      if (sourceFile.getRegionList() != null) {
+        blameResult.process(source.getCommit(), sourceFile);
+      }
+    }
+
+    parent.getFileIndex().removeFilesWithoutRegions();
   }
 
   public void splitBlameWithParent(ObjectReader objectReader, FileCandidate parent, FileCandidate source) {
@@ -29,8 +44,5 @@ public class FileBlamer {
     }
 
     parent.takeBlame(editList, source);
-    if (source.getRegionList() != null) {
-      blameResult.process(source.getCommit(), source);
-    }
   }
 }
