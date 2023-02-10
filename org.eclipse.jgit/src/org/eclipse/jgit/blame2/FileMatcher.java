@@ -13,10 +13,16 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.treewalk.TreeWalk;
 
 public class FileMatcher {
-  public List<FileMatch> match(Repository repo, RevCommit c1, RevCommit c2) throws IOException {
-    Map<String, CommitFile> c1Files = processTree(repo, c1)
+  private final Repository repository;
+
+  public FileMatcher(Repository repository) {
+    this.repository = repository;
+  }
+
+  public List<FileMatch> match(RevCommit c1, RevCommit c2) throws IOException {
+    Map<String, CommitFile> c1Files = getCommitFiles(c1)
       .stream().collect(Collectors.toMap(CommitFile::getPath, f -> f));
-    Map<String, CommitFile> c2Files = processTree(repo, c2)
+    Map<String, CommitFile> c2Files = getCommitFiles(c2)
       .stream().collect(Collectors.toMap(CommitFile::getPath, f -> f));
 
     List<FileMatch> matches = new LinkedList<>();
@@ -28,7 +34,24 @@ public class FileMatcher {
     return matches;
   }
 
-  private static class FileMatch {
+  public List<CommitFile> getCommitFiles(RevCommit commit) throws IOException {
+    MutableObjectId idBuf = new MutableObjectId();
+    List<CommitFile> files = new LinkedList<>();
+
+    try (ObjectReader objectReader = repository.newObjectReader()) {
+      TreeWalk treeWalk = new TreeWalk(repository, objectReader);
+      treeWalk.setRecursive(true);
+      treeWalk.addTree(commit.getTree());
+
+      while (treeWalk.next()) {
+        treeWalk.getObjectId(idBuf, 0);
+        files.add(new CommitFile(treeWalk.getPathString(), idBuf.toObjectId()));
+      }
+    }
+    return files;
+  }
+
+  public static class FileMatch {
     private final CommitFile file;
     private final CommitFile parentFile;
 
@@ -46,26 +69,7 @@ public class FileMatcher {
     }
   }
 
-
-  public List<CommitFile> processTree(Repository repo, RevCommit commit) throws IOException {
-    // TODO cache it?
-    MutableObjectId idBuf = new MutableObjectId();
-    List<CommitFile> files = new LinkedList<>();
-
-    try (ObjectReader objectReader = repo.newObjectReader()) {
-      TreeWalk treeWalk = new TreeWalk(repo, objectReader);
-      treeWalk.setRecursive(true);
-      treeWalk.addTree(commit.getTree());
-
-      while (treeWalk.next()) {
-        treeWalk.getObjectId(idBuf, 0);
-        files.add(new CommitFile(treeWalk.getPathString(), idBuf.toObjectId()));
-      }
-    }
-    return files;
-  }
-
-  private static class CommitFile {
+  public static class CommitFile {
     private final String path;
     private final ObjectId objectId;
 

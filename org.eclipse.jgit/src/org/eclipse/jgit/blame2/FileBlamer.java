@@ -4,6 +4,7 @@ import org.eclipse.jgit.diff.DiffAlgorithm;
 import org.eclipse.jgit.diff.EditList;
 import org.eclipse.jgit.diff.HistogramDiff;
 import org.eclipse.jgit.diff.RawTextComparator;
+import org.eclipse.jgit.lib.ObjectReader;
 
 public class FileBlamer {
   private final FileReader fileReader;
@@ -16,8 +17,10 @@ public class FileBlamer {
     this.blameResult = blameResult;
   }
 
-  public void splitBlameWithParent(FileCandidate parent, FileCandidate source) {
-    EditList editList = diffAlgorithm.diff(textComparator, fileReader.loadText(parent.getBlob()), fileReader.loadText(source.getBlob()));
+  public void splitBlameWithParent(ObjectReader objectReader, FileCandidate parent, FileCandidate source) {
+    EditList editList = diffAlgorithm.diff(textComparator,
+      fileReader.loadText(objectReader, parent.getBlob()),
+      fileReader.loadText(objectReader, source.getBlob()));
     if (editList.isEmpty()) {
       // Ignoring whitespace (or some other special comparator) can cause non-identical blobs to have an empty edit list
       parent.setRegionList(source.getRegionList());

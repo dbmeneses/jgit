@@ -3,12 +3,13 @@ package org.eclipse.jgit.blame2;
 import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.internal.JGitText;
-import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
@@ -19,9 +20,11 @@ import org.eclipse.jgit.treewalk.TreeWalk;
 public class BlameGenerator {
   private final TreeSet<Commit> queue = new TreeSet<>(Commit.TIME_COMPARATOR);
   private final Repository repository;
+  private BlameResult blameResult;
   private final Collection<String> filePathsToBlame;
-  private final MutableObjectId idBuf;
-  private Commit currentNode = null;
+  private final FileMatcher fileMatcher;
+  private final FileBlamer fileBlamer;
+
   /**
    * Revision pool used to acquire commits from.
    */
@@ -29,10 +32,12 @@ public class BlameGenerator {
   private ObjectReader reader;
   private TreeWalk treeWalk;
 
-  public BlameGenerator(Repository repository, Collection<String> filePathsToBlame) {
+  public BlameGenerator(Repository repository, BlameResult blameResult, Collection<String> filePathsToBlame) {
     this.repository = repository;
+    this.fileMatcher = new FileMatcher(repository);
+    this.blameResult = blameResult;
+    this.fileBlamer = new FileBlamer(new FileReader(), blameResult);
     this.filePathsToBlame = filePathsToBlame;
-    this.idBuf = new MutableObjectId();
     initRevPool();
   }
 
@@ -48,15 +53,23 @@ public class BlameGenerator {
     if (head == null) {
       throw new NoHeadException(MessageFormat.format(JGitText.get().noSuchRefKnown, Constants.HEAD));
     }
-    currentNode = push(head);
-    return this;
-  }
 
-  public Commit push(AnyObjectId id) throws IOException {
-    RevCommit commit = revPool.parseCommit(id);
-    Commit commitCandidate = new Commit(commit);
+    RevCommit commit = revPool.parseCommit(head);
+    List<FileCandidate> commitFiles = fileMatcher.getCommitFiles(commit)
+      .stream()
+      .map(f -> new FileCandidate(commit, f.getPath(), f.getObjectId()))
+      .collect(Collectors.toList());
+
+    for (FileCandidate fileCandidate : commitFiles) {
+      // TODO read number of lines. ALso report sizes to BlameResult?
+      fileCandidate.setRegionList();
+    }
+    
+    CommitFileIndex fileIndex = new CommitFileIndex(commitFiles);
+    Commit commitCandidate = new Commit(commit, fileIndex);
     push(commitCandidate);
-    return commitCandidate;
+
+    return this;
   }
 
   public BlameGenerator push(Commit commitCandidate) {
@@ -66,7 +79,6 @@ public class BlameGenerator {
   }
 
   public boolean next() throws IOException {
-    // TODO process regions
     for (; ; ) {
       Commit n = queue.pollFirst();
       System.out.println("POLL: " + n);
@@ -76,18 +88,11 @@ public class BlameGenerator {
 
       int pCnt = n.getParentCount();
       if (pCnt == 1) {
-        if (processOne(n)) {
-          return true;
-        }
-
+        processOne(n);
       } else if (pCnt > 1) {
-        if (processMerge(n)) {
-          return true;
-        }
-
+        processMerge(n);
       } else {
-        // Root commit, with at least one surviving region.
-        // Assign the remaining blame here.
+        // Root commit, with at least one surviving region. Assign the remaining blame here.
         // TODO
       }
     }
@@ -99,27 +104,25 @@ public class BlameGenerator {
     return false;
   }
 
-  private boolean processOne(Commit n) throws IOException {
+  private void processOne(Commit n) throws IOException {
     RevCommit parentCommit = n.getParent();
-    if (parentCommit == null) {
-      // TODO
-      //return split(n.getNextCandidate(0), n);
-      return false;
-    }
     revPool.parseHeaders(parentCommit);
+    // TODO process regions
+
+    Map<String, FileCandidate> parentFilesByPath = fileMatcher.getCommitFiles(parentCommit).stream()
+      .map(file -> new FileCandidate(parentCommit, file.getPath(), file.getObjectId()))
+      .collect(Collectors.toMap(FileCandidate::getPath, f -> f));
+
     Commit parentCandidate = push(parentCommit);
 
-    if (n.sourceCommit == null) {
-      // TODO
-      //return result(n);
-      return false;
+    if (n.getCommit() == null) {
+      // TODO not sure in what situation this can happen
+      return;
     }
 
     // TODO: detection of rename
-    return true;
   }
 
-  private boolean processMerge(Commit commitCandidate) {
-    return true;
+  private void processMerge(Commit commitCandidate) {
   }
 }

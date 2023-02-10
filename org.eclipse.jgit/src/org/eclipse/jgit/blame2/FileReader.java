@@ -10,28 +10,14 @@ import org.eclipse.jgit.lib.ObjectReader;
 /**
  * Reads the contents of a BLOB object (typically a file)
  */
-public class FileReader implements AutoCloseable {
-  private ObjectReader objectReader;
-
-  public FileReader(ObjectReader objectReader) {
-    this.objectReader = objectReader;
-  }
-
-  public RawText loadText(ObjectId objectId) {
+public class FileReader {
+  public RawText loadText(ObjectReader objectReader, ObjectId objectId) {
     try {
       // TODO applySmudgeFilter?
       ObjectLoader open = objectReader.open(objectId, Constants.OBJ_BLOB);
       return new RawText(open.getCachedBytes(Integer.MAX_VALUE));
     } catch (IOException e) {
       throw new IllegalStateException(e);
-    }
-  }
-
-  @Override
-  public void close() {
-    if (objectReader != null) {
-      objectReader.close();
-      objectReader = null;
     }
   }
 }

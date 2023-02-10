@@ -2,7 +2,6 @@ package org.eclipse.jgit.blame2;
 
 import java.util.Comparator;
 import java.util.Objects;
-import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.revwalk.RevCommit;
 
 public class Commit {
@@ -10,10 +9,16 @@ public class Commit {
     .comparingInt(Commit::getTime)
     .thenComparing(Commit::getCommit);
 
-  RevCommit sourceCommit;
+  private final RevCommit sourceCommit;
+  private final CommitFileIndex fileIndex;
 
-  Commit(RevCommit commit) {
-    sourceCommit = commit;
+  Commit(RevCommit commit, CommitFileIndex fileIndex) {
+    this.sourceCommit = commit;
+    this.fileIndex = fileIndex;
+  }
+
+  CommitFileIndex getFileIndex() {
+    return fileIndex;
   }
 
   RevCommit getCommit() {
@@ -30,10 +35,6 @@ public class Commit {
 
   int getTime() {
     return sourceCommit.getCommitTime();
-  }
-
-  PersonIdent getAuthor() {
-    return sourceCommit.getAuthorIdent();
   }
 
   /** {@inheritDoc} */
