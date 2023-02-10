@@ -8,7 +8,8 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-package org.eclipse.jgit.blame;
+package org.eclipse.jgit.blame2;
+
 
 /**
  * Region of the result that still needs to be computed.

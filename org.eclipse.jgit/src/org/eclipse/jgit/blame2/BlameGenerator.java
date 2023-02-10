@@ -5,9 +5,6 @@ import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.TreeSet;
 import org.eclipse.jgit.api.errors.NoHeadException;
-import org.eclipse.jgit.diff.DiffAlgorithm;
-import org.eclipse.jgit.diff.HistogramDiff;
-import org.eclipse.jgit.diff.RawTextComparator;
 import org.eclipse.jgit.internal.JGitText;
 import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
@@ -19,13 +16,12 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.treewalk.TreeWalk;
 
-public class RepoBlameGenerator {
-  private final DiffAlgorithm diffAlgorithm = new HistogramDiff();
-  private final RawTextComparator textComparator = RawTextComparator.DEFAULT;
-  private final TreeSet<CommitCandidate> queue = new TreeSet<>(CommitCandidate.TIME_COMPARATOR);
+public class BlameGenerator {
+  private final TreeSet<Commit> queue = new TreeSet<>(Commit.TIME_COMPARATOR);
   private final Repository repository;
   private final Collection<String> filePathsToBlame;
   private final MutableObjectId idBuf;
+  private Commit currentNode = null;
   /**
    * Revision pool used to acquire commits from.
    */
@@ -33,7 +29,7 @@ public class RepoBlameGenerator {
   private ObjectReader reader;
   private TreeWalk treeWalk;
 
-  public RepoBlameGenerator(Repository repository, Collection<String> filePathsToBlame) {
+  public BlameGenerator(Repository repository, Collection<String> filePathsToBlame) {
     this.repository = repository;
     this.filePathsToBlame = filePathsToBlame;
     this.idBuf = new MutableObjectId();
@@ -47,27 +43,24 @@ public class RepoBlameGenerator {
     treeWalk.setRecursive(true);
   }
 
-  public RepoBlameGenerator prepareHead() throws NoHeadException, IOException {
+  public BlameGenerator prepareHead() throws NoHeadException, IOException {
     ObjectId head = repository.resolve(Constants.HEAD);
     if (head == null) {
       throw new NoHeadException(MessageFormat.format(JGitText.get().noSuchRefKnown, Constants.HEAD));
     }
-    push(head);
+    currentNode = push(head);
     return this;
   }
 
-  public RepoBlameGenerator push(AnyObjectId id) throws IOException {
+  public Commit push(AnyObjectId id) throws IOException {
     RevCommit commit = revPool.parseCommit(id);
-    push(new CommitCandidate(repository, commit));
-    return this;
+    Commit commitCandidate = new Commit(commit);
+    push(commitCandidate);
+    return commitCandidate;
   }
 
-  public RepoBlameGenerator push(CommitCandidate commitCandidate) {
-    if (queue.contains(commitCandidate)) {
-      // TODO
-      throw new IllegalStateException();
-    }
-
+  public BlameGenerator push(Commit commitCandidate) {
+    // TODO detect nodes already seen
     queue.add(commitCandidate);
     return this;
   }
@@ -75,7 +68,7 @@ public class RepoBlameGenerator {
   public boolean next() throws IOException {
     // TODO process regions
     for (; ; ) {
-      CommitCandidate n = queue.pollFirst();
+      Commit n = queue.pollFirst();
       System.out.println("POLL: " + n);
       if (n == null) {
         return done();
@@ -106,15 +99,15 @@ public class RepoBlameGenerator {
     return false;
   }
 
-  private boolean processOne(CommitCandidate n) throws IOException {
-    RevCommit parent = n.getParent(0);
-    if (parent == null) {
+  private boolean processOne(Commit n) throws IOException {
+    RevCommit parentCommit = n.getParent();
+    if (parentCommit == null) {
       // TODO
       //return split(n.getNextCandidate(0), n);
       return false;
     }
-    revPool.parseHeaders(parent);
-    push(parent);
+    revPool.parseHeaders(parentCommit);
+    Commit parentCandidate = push(parentCommit);
 
     if (n.sourceCommit == null) {
       // TODO
@@ -126,7 +119,7 @@ public class RepoBlameGenerator {
     return true;
   }
 
-  private boolean processMerge(CommitCandidate commitCandidate) {
+  private boolean processMerge(Commit commitCandidate) {
     return true;
   }
 }

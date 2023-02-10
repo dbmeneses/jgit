@@ -3,19 +3,16 @@ package org.eclipse.jgit.blame2;
 import java.util.Comparator;
 import java.util.Objects;
 import org.eclipse.jgit.lib.PersonIdent;
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 
-public class CommitCandidate {
-  public static final Comparator<CommitCandidate> TIME_COMPARATOR = Comparator.comparingInt(CommitCandidate::getTime).thenComparing(CommitCandidate::getCommit);
+public class Commit {
+  public static final Comparator<Commit> TIME_COMPARATOR = Comparator
+    .comparingInt(Commit::getTime)
+    .thenComparing(Commit::getCommit);
 
-  /** Next candidate in the candidate queue. */
-  CommitCandidate queueNext;
-
-  /** Commit being considered (or blamed, depending on state). */
   RevCommit sourceCommit;
 
-  CommitCandidate(Repository repo, RevCommit commit) {
+  Commit(RevCommit commit) {
     sourceCommit = commit;
   }
 
@@ -27,8 +24,8 @@ public class CommitCandidate {
     return sourceCommit.getParentCount();
   }
 
-  RevCommit getParent(int idx) {
-    return sourceCommit.getParent(idx);
+  RevCommit getParent() {
+    return sourceCommit.getParent(0);
   }
 
   int getTime() {
@@ -37,10 +34,6 @@ public class CommitCandidate {
 
   PersonIdent getAuthor() {
     return sourceCommit.getAuthorIdent();
-  }
-
-  CommitCandidate create(Repository repo, RevCommit commit) {
-    return new CommitCandidate(repo, commit);
   }
 
   /** {@inheritDoc} */
@@ -64,7 +57,7 @@ public class CommitCandidate {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    CommitCandidate that = (CommitCandidate) o;
+    Commit that = (Commit) o;
     return Objects.equals(sourceCommit, that.sourceCommit);
   }
 

@@ -5,11 +5,12 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.List;
+import java.util.function.Supplier;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.blame.BlameResult;
-import org.eclipse.jgit.blame2.RepoBlameGenerator;
+import org.eclipse.jgit.blame2.BlameGenerator;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.MutableObjectId;
@@ -44,7 +45,7 @@ public class BlameTest {
     try (Repository repo = loadRepository(projectDir)) {
 
       Collection<String> files = List.of("file");
-      RepoBlameGenerator repoBlameGenerator = new RepoBlameGenerator(repo, files);
+      BlameGenerator repoBlameGenerator = new BlameGenerator(repo, files);
       repoBlameGenerator.prepareHead();
 
       while (repoBlameGenerator.next()) {
@@ -85,20 +86,24 @@ public class BlameTest {
 
       while (treeWalk.next()) {
         treeWalk.getObjectId(idBuf, 0);
-        RawText rawText = loadText(objectReader, idBuf.toObjectId());
+        Supplier<RawText> rawText = () -> loadText(objectReader, idBuf.toObjectId());
         fileProcessor.process(treeWalk.getPathString(), rawText);
       }
     }
   }
 
   private interface FileProcessor {
-    void process(String path, RawText rawText);
+    void process(String path, Supplier<RawText> rawText);
   }
 
-  private RawText loadText(ObjectReader reader, ObjectId objectId) throws IOException {
+  private RawText loadText(ObjectReader reader, ObjectId objectId) {
+    try {
     // TODO applySmudgeFilter?
     ObjectLoader open = reader.open(objectId, Constants.OBJ_BLOB);
     return new RawText(open.getCachedBytes(Integer.MAX_VALUE));
+    } catch (IOException e) {
+      throw new IllegalStateException(e);
+    }
   }
 
   private Repository loadRepository(Path dir) throws IOException {

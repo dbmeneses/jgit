@@ -1,0 +1,33 @@
+package org.eclipse.jgit.blame2;
+
+import org.eclipse.jgit.diff.DiffAlgorithm;
+import org.eclipse.jgit.diff.EditList;
+import org.eclipse.jgit.diff.HistogramDiff;
+import org.eclipse.jgit.diff.RawTextComparator;
+
+public class FileBlamer {
+  private final FileReader fileReader;
+  private final DiffAlgorithm diffAlgorithm = new HistogramDiff();
+  private final RawTextComparator textComparator = RawTextComparator.DEFAULT;
+  private final BlameResult blameResult;
+
+  public FileBlamer(FileReader fileReader, BlameResult blameResult) {
+    this.fileReader = fileReader;
+    this.blameResult = blameResult;
+  }
+
+  public void splitBlameWithParent(FileCandidate parent, FileCandidate source) {
+    EditList editList = diffAlgorithm.diff(textComparator, fileReader.loadText(parent.getBlob()), fileReader.loadText(source.getBlob()));
+    if (editList.isEmpty()) {
+      // Ignoring whitespace (or some other special comparator) can cause non-identical blobs to have an empty edit list
+      parent.setRegionList(source.getRegionList());
+      source.setRegionList(null);
+      return;
+    }
+
+    parent.takeBlame(editList, source);
+    if (source.getRegionList() != null) {
+      blameResult.process(source.getCommit(), source);
+    }
+  }
+}
