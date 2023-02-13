@@ -17,14 +17,14 @@ public class BlameGeneratorTest {
 
   @Test
   public void testNewBlameGenerator() throws IOException, NoHeadException {
-    Path projectDir = Paths.get("/tmp/proj");
+    //Path projectDir = Paths.get("C:\\Users\\meneses\\test").toAbsolutePath();
+    Path projectDir = Paths.get("C:\\Users\\meneses\\git\\sonar-enterprise").toAbsolutePath();
 
     try (Repository repo = loadRepository(projectDir)) {
       BlameResult result = new BlameResult();
       BlobReader blobReader = new BlobReader();
       StatefulCommitFactory statefulCommitFactory = new StatefulCommitFactory(new CommitFileTreeReader(repo));
       BlameGenerator blameGenerator = new BlameGenerator(repo, result, blobReader, statefulCommitFactory);
-      blameGenerator.prepareHead();
       blameGenerator.compute();
 
       System.out.println("===== results ======");

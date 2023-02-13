@@ -1,14 +1,15 @@
 package org.eclipse.jgit.blame2;
 
-import java.io.IOException;
-import java.util.LinkedList;
-import java.util.List;
 import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.treewalk.TreeWalk;
+
+import java.io.IOException;
+import java.util.LinkedList;
+import java.util.List;
 
 public class CommitFileTreeReader {
   private final Repository repository;
@@ -17,19 +18,20 @@ public class CommitFileTreeReader {
     this.repository = repository;
   }
 
-  public List<CommitFile> findFiles(RevCommit commit) throws IOException {
+  /**
+   * Find all files in a given commit.
+   */
+  public List<CommitFile> findFiles(ObjectReader objectReader, RevCommit commit) throws IOException {
     MutableObjectId idBuf = new MutableObjectId();
     List<CommitFile> files = new LinkedList<>();
 
-    try (ObjectReader objectReader = repository.newObjectReader()) {
-      TreeWalk treeWalk = new TreeWalk(repository, objectReader);
-      treeWalk.setRecursive(true);
-      treeWalk.addTree(commit.getTree());
+    TreeWalk treeWalk = new TreeWalk(repository, objectReader);
+    treeWalk.setRecursive(true);
+    treeWalk.addTree(commit.getTree());
 
-      while (treeWalk.next()) {
-        treeWalk.getObjectId(idBuf, 0);
-        files.add(new CommitFile(treeWalk.getPathString(), idBuf.toObjectId()));
-      }
+    while (treeWalk.next()) {
+      treeWalk.getObjectId(idBuf, 0);
+      files.add(new CommitFile(treeWalk.getPathString(), idBuf.toObjectId()));
     }
     return files;
   }

@@ -23,7 +23,8 @@ public class BlameGenerator {
   /**
    * Revision pool used to acquire commits from.
    */
-  private RevWalk revPool;
+  // TODO is it worth to use its object reader everywhere or only in certain cases? What exactly is cached?
+  private final RevWalk revPool;
 
   public BlameGenerator(Repository repository, BlameResult blameResult, BlobReader blobReader, StatefulCommitFactory statefulCommitFactory) {
     this.repository = repository;
@@ -31,22 +32,20 @@ public class BlameGenerator {
     this.fileBlamer = new FileBlamer(new BlobReader(), blameResult);
     this.blobReader = blobReader;
     this.statefulCommitFactory = statefulCommitFactory;
-    initRevPool();
+    this.revPool = new RevWalk(repository);
   }
 
-  private void initRevPool() {
-    revPool = new RevWalk(repository);
-  }
-
-  public BlameGenerator prepareHead() throws NoHeadException, IOException {
+  private void prepareHead() throws NoHeadException, IOException {
     ObjectId head = repository.resolve(Constants.HEAD);
     if (head == null) {
       throw new NoHeadException(MessageFormat.format(JGitText.get().noSuchRefKnown, Constants.HEAD));
     }
 
     RevCommit headCommit = revPool.parseCommit(head);
-    StatefulCommit statefulHeadCommit = statefulCommitFactory.create(headCommit);
+    StatefulCommit statefulHeadCommit = statefulCommitFactory.create(revPool.getObjectReader(), headCommit);
 
+    // Read all file's contents to get the number of lines in each file. With that, we can initialize regions and
+    // also the arrays that will contain the blame results
     for (FileCandidate fileCandidate : statefulHeadCommit.getFileIndex().getAll()) {
       RawText rawText = blobReader.loadText(revPool.getObjectReader(), fileCandidate.getBlob());
 
@@ -55,61 +54,58 @@ public class BlameGenerator {
     }
 
     push(statefulHeadCommit);
-    return this;
   }
 
-  public BlameGenerator push(StatefulCommit commitCandidate) {
-    // TODO detect nodes already seen
+  private void push(StatefulCommit commitCandidate) {
+    // TODO detect nodes that were already seen
     queue.add(commitCandidate);
-    return this;
   }
 
-  public void compute() throws IOException {
+  public void compute() throws IOException, NoHeadException {
+    prepareHead();
+
     for (; ; ) {
-      StatefulCommit n = queue.pollFirst();
-      System.out.println("POLL: " + n);
-      if (n == null) {
-        done();
+      StatefulCommit current = queue.pollFirst();
+      if (current == null) {
+        close();
         return;
       }
+      System.out.println("POLL: " + current + " Files left to blame: " + current.getFileIndex().getAll().size());
 
-      int pCnt = n.getParentCount();
+      int pCnt = current.getParentCount();
       if (pCnt == 1) {
-        processOne(n);
+        processOne(current);
       } else if (pCnt > 1) {
-        processMerge(n);
+        processMerge(current);
       } else {
-        // Root commit, with at least one surviving region. Assign the remaining blame here.
-        // TODO
+        // no more parents, so blame all remaining regions to the current commit
+        fileBlamer.blameLastCommit(current);
       }
     }
   }
 
-  private boolean done() {
-    revPool.close();
-    queue.clear();
-    return false;
-  }
-
-  private void processOne(StatefulCommit n) throws IOException {
-    RevCommit parentCommit = n.getParent();
+  private void processOne(StatefulCommit current) throws IOException {
+    RevCommit parentCommit = current.getParent();
     revPool.parseHeaders(parentCommit);
-    StatefulCommit parent = statefulCommitFactory.create(parentCommit);
-    fileBlamer.blame(revPool.getObjectReader(), parent, n);
+    StatefulCommit parent = statefulCommitFactory.create(revPool.getObjectReader(), parentCommit);
+    fileBlamer.blame(revPool.getObjectReader(), parent, current);
 
     if (!parent.getFileIndex().isEmpty()) {
       push(parent);
     }
 
-    if (n.getCommit() == null) {
+    if (current.getCommit() == null) {
       // TODO not sure in what situation this can happen
       return;
     }
-
-    // TODO: detection of rename
   }
 
   private void processMerge(StatefulCommit commitCandidate) {
     // TODO
+  }
+
+  private void close() {
+    revPool.close();
+    queue.clear();
   }
 }

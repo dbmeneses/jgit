@@ -1,24 +1,22 @@
 package org.eclipse.jgit.api.blame;
 
-import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.function.Supplier;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.blame.BlameResult;
+import org.eclipse.jgit.blame2.CommitFileTreeReader;
 import org.eclipse.jgit.diff.RawText;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.MutableObjectId;
-import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.ObjectLoader;
-import org.eclipse.jgit.lib.ObjectReader;
-import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.RepositoryBuilder;
+import org.eclipse.jgit.diff.RawTextComparator;
+import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.treewalk.TreeWalk;
 import org.junit.Test;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Collection;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 public class BlameTest {
   @Test
@@ -33,6 +31,29 @@ public class BlameTest {
         System.out.println(file.getSourceLine(i) + " " + file.getSourceCommit(i) + " " + file.getSourceAuthor(i).getEmailAddress());
       }
     }
+  }
+
+  @Test
+  public void testOldImplementation() throws IOException, GitAPIException {
+    Path projectDir = Paths.get("C:\\Users\\meneses\\git\\sonar-enterprise").toAbsolutePath();
+
+    try (Repository repo = loadRepository(projectDir)) {
+      Collection<String> paths = readFiles(repo);
+      for (String p : paths) {
+        System.out.println(p);
+        BlameResult blameResult = Git.wrap(repo).blame()
+                // Equivalent to -w command line option
+                .setTextComparator(RawTextComparator.WS_IGNORE_ALL)
+                .setFilePath(p).call();
+      }
+    }
+  }
+
+  private Collection<String> readFiles(Repository repository) throws IOException {
+    CommitFileTreeReader treeReader = new CommitFileTreeReader(repository);
+    RevCommit head = repository.parseCommit(repository.resolve(Constants.HEAD));
+    return treeReader.findFiles(repository.newObjectReader(), head).stream().map(CommitFileTreeReader.CommitFile::getPath)
+            .collect(Collectors.toList());
   }
 
   public void processTree(Repository repo, RevCommit commit, FileProcessor fileProcessor) throws IOException {
