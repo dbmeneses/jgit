@@ -17,6 +17,7 @@ public class BlameGenerator {
   private final Repository repository;
   private final BlameResult blameResult;
   private final FileBlamer fileBlamer;
+  private final BlobReader blobReader;
   private final StatefulCommitFactory statefulCommitFactory;
 
   /**
@@ -24,10 +25,11 @@ public class BlameGenerator {
    */
   private RevWalk revPool;
 
-  public BlameGenerator(Repository repository, BlameResult blameResult, StatefulCommitFactory statefulCommitFactory) {
+  public BlameGenerator(Repository repository, BlameResult blameResult, BlobReader blobReader, StatefulCommitFactory statefulCommitFactory) {
     this.repository = repository;
     this.blameResult = blameResult;
     this.fileBlamer = new FileBlamer(new BlobReader(), blameResult);
+    this.blobReader = blobReader;
     this.statefulCommitFactory = statefulCommitFactory;
     initRevPool();
   }
@@ -46,7 +48,7 @@ public class BlameGenerator {
     StatefulCommit statefulHeadCommit = statefulCommitFactory.create(headCommit);
 
     for (FileCandidate fileCandidate : statefulHeadCommit.getFileIndex().getAll()) {
-      RawText rawText = blobReader.loadText(objectReader, fileCandidate.getBlob());
+      RawText rawText = blobReader.loadText(revPool.getObjectReader(), fileCandidate.getBlob());
 
       fileCandidate.setRegionList(new Region(0, 0, rawText.size()));
       blameResult.initialize(fileCandidate.getPath(), rawText.size());
@@ -62,12 +64,13 @@ public class BlameGenerator {
     return this;
   }
 
-  public boolean next() throws IOException {
+  public void compute() throws IOException {
     for (; ; ) {
       StatefulCommit n = queue.pollFirst();
       System.out.println("POLL: " + n);
       if (n == null) {
-        return done();
+        done();
+        return;
       }
 
       int pCnt = n.getParentCount();
@@ -82,7 +85,7 @@ public class BlameGenerator {
     }
   }
 
-  public boolean done() {
+  private boolean done() {
     revPool.close();
     queue.clear();
     return false;

@@ -3,14 +3,10 @@ package org.eclipse.jgit.api.blame;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collection;
-import java.util.List;
 import java.util.function.Supplier;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.blame.BlameResult;
-import org.eclipse.jgit.blame2.BlameGenerator;
 import org.eclipse.jgit.diff.RawText;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.MutableObjectId;
@@ -36,42 +32,6 @@ public class BlameTest {
       for (int i = 0; i < file.getResultContents().size(); i++) {
         System.out.println(file.getSourceLine(i) + " " + file.getSourceCommit(i) + " " + file.getSourceAuthor(i).getEmailAddress());
       }
-    }
-  }
-
-  @Test
-  public void testRepoBlameGenerator() throws IOException, NoHeadException {
-    Path projectDir = Paths.get("/tmp/proj");
-    try (Repository repo = loadRepository(projectDir)) {
-
-      Collection<String> files = List.of("file");
-      BlameGenerator repoBlameGenerator = new BlameGenerator(repo, files);
-      repoBlameGenerator.prepareHead();
-
-      while (repoBlameGenerator.next()) {
-      }
-
-    }
-  }
-
-  @Test
-  public void testTreeWalk() throws IOException {
-    Path projectDir = Paths.get("/tmp/proj");
-
-    try (Repository repo = loadRepository(projectDir)) {
-      Ref head = repo.exactRef("HEAD");
-      if (head == null) {
-        throw new IOException("HEAD reference not found");
-      }
-      RevCommit headCommit = repo.parseCommit(head.getObjectId());
-
-      processTree(repo, headCommit, (path, rawText) -> {
-        System.out.println(path);
-        System.out.println("======= contents =======");
-        for (int i = 0; i < rawText.size(); i++) {
-          System.out.println(rawText.getString(i));
-        }
-      });
     }
   }
 

@@ -37,12 +37,10 @@ public class StatefulCommit {
     return sourceCommit.getCommitTime();
   }
 
-  /** {@inheritDoc} */
-  @SuppressWarnings("nls")
   @Override
   public String toString() {
     StringBuilder r = new StringBuilder();
-    r.append("Candidate[");
+    r.append("Commit[");
     if (sourceCommit != null) {
       r.append(" @ ").append(sourceCommit.abbreviate(6).name());
     }

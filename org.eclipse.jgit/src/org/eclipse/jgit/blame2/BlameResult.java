@@ -33,7 +33,7 @@ public class BlameResult {
     return r.resultStart + r.length;
   }
 
-  private static class FileBlame {
+  public static class FileBlame {
     private final String path;
     private final RevCommit[] commits;
     private final PersonIdent[] authors;
@@ -42,6 +42,22 @@ public class BlameResult {
       this.path = path;
       this.commits = new RevCommit[numberLines];
       this.authors = new PersonIdent[numberLines];
+    }
+
+    public String getPath() {
+      return path;
+    }
+
+    public RevCommit[] getCommits() {
+      return commits;
+    }
+
+    public PersonIdent[] getAuthors() {
+      return authors;
+    }
+
+    public int lines() {
+      return commits.length;
     }
   }
 }
